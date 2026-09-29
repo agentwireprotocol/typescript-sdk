@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
 import {
   Identity,
   UlidGen,
@@ -35,10 +34,14 @@ describe("wire", () => {
     );
   });
 
-  test("the grant example in the spec verifies, and minted grants verify", () => {
-    const spec = readFileSync(new URL("../../awp-engine/SPEC.md", import.meta.url), "utf8");
-    const m = /```json\n(\{"iss":[\s\S]*?)\n```/.exec(spec);
-    if (m) expect(verifyGrant(JSON.parse(m[1]!))[0]).toBe(false); // expired since 2026-09-25 20:00 UTC, signature aside
+  test("the grant example in the spec has a real signature, and minted grants verify", () => {
+    // SPEC.md section 10.2. It expired on 2026-09-25, so verification gets as far as the expiry check,
+    // which means the signature over the canonical object verified.
+    const example = JSON.parse(
+      '{"iss": "ed25519:4ypZnypm77nHtEjcuPHYf0KO6L3XClTwNG8t4d3u9iI", "sub": "ed25519:SzOoZZ93chgozsW4_k3Bng7bw8nm9jhE8F_MT7DwsZM", "caps": ["exec", "fs:read"], "exp": "2026-09-25T20:00:00Z", "nonce": "mi7aguVbYbdo0OZSdAyKig", "sig": "KIc8YtMgZ0mjshD6ypfayh4E3QHHeRlpX2yL9HU1cpPHoqgIXYh9Ry00Shafa34OvFif31huoA1v5YbnsmUEDg"}',
+    );
+    expect(verifyGrant(example)).toEqual([false, "grant has expired"]);
+    expect(verifyGrant({ ...example, caps: ["admin"] })[1]).toBe("signature does not verify");
     const a = Identity.generate();
     const b = Identity.generate();
     const g = mintGrant(a, b.key, ["exec", "fs:read"], 60);
