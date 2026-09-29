@@ -28,6 +28,6 @@ jobs:
       - run: bun run typecheck
       - run: bun run build
       - name: Build awp, for the conformance suite
-        run: go install github.com/agentwireprotocol/awp/cmd/awp@main
+        run: go install github.com/agentwireprotocol/awp/cmd/awp@v0.6.0
       - name: Tests, including the conformance suite
         run: AWP_BIN="$(go env GOPATH)/bin/awp" bun test
