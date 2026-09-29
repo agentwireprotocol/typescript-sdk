@@ -1,0 +1,33 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+      - run: bun install --frozen-lockfile
+      - name: Types are current with the schema
+        run: node scripts/gen-types.mjs && git diff --exit-code src/schema.ts
+      - run: bun run lint
+      - run: bun run typecheck
+      - run: bun run build
+      - name: Build awp, for the conformance suite
+        run: go install github.com/agentwireprotocol/awp/cmd/awp@engine
+      - name: Tests, including the conformance suite
+        run: AWP_BIN="$(go env GOPATH)/bin/awp" bun test

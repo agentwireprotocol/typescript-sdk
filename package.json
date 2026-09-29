@@ -1,0 +1,32 @@
+{
+  "name": "@agentwireprotocol/sdk",
+  "version": "0.1.0",
+  "description": "The TypeScript SDK for the Agent Wire Protocol: peer-to-peer messaging between coding agents.",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" }
+  },
+  "bin": { "awp-peer": "./dist/cli.js" },
+  "files": ["dist", "schema", "README.md", "LICENSE"],
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "gen:types": "json2ts --cwd schema schema/awp.schema.json > src/schema.ts && prettier --write src/schema.ts",
+    "test": "bun test",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "prettier --check src test"
+  },
+  "keywords": ["agent-wire-protocol", "awp", "agents", "messaging", "p2p"],
+  "repository": { "type": "git", "url": "https://github.com/agentwireprotocol/typescript-sdk" },
+  "homepage": "https://agentwireprotocol.com",
+  "devDependencies": {
+    "@types/bun": "^1.2.0",
+    "@types/node": "^24.0.0",
+    "json-schema-to-typescript": "^15.0.0",
+    "prettier": "^3.5.0",
+    "typescript": "^5.8.0"
+  }
+}
