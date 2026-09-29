@@ -558,6 +558,14 @@ export class GrantList {
     return [...this.items];
   }
 
+  remove(sig: unknown): boolean {
+    const keep = this.items.filter((g) => g.sig !== sig);
+    if (keep.length === this.items.length) return false;
+    this.items = keep;
+    this.save();
+    return true;
+  }
+
   save(): void {
     this.backend.writeJson(this.name, this.items);
   }
@@ -573,6 +581,7 @@ export interface PeerMeta {
   caps?: string[];
   last_connected?: string;
   dialed?: string;
+  addr?: string;
 }
 
 /** All durable state about one remote key (or the pending queue). */

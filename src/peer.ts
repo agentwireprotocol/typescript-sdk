@@ -63,6 +63,7 @@ import {
   blobRefs,
   encodeLine,
   formatKey,
+  grantHash,
   keyFingerprint,
   mintGrant,
   nowTs,
@@ -832,6 +833,13 @@ export class Peer {
 
   private grantHonored(g: Record<string, unknown>, ps: PeerState): boolean {
     if (!verifyGrant(g)[0]) return false;
+    if (typeof g.aud === "string") {
+      try {
+        if (!parseKey(g.aud).equals(this.identity.publicKey)) return false; // meant for another peer to honor
+      } catch {
+        return false;
+      }
+    }
     const iss = parseKey(g.iss);
     if (this.isRoot(iss)) return true;
     const supporting = [...ps.grants.items, ...this.issued.items, ...this.held.items];
@@ -1025,6 +1033,44 @@ export class Peer {
   /** The capabilities the peer holds on this Peer, from honored grants. */
   caps(to: string): Set<string> {
     return this.honoredCaps(this.ps(to));
+  }
+
+  /** The grants this Peer issued and the ones it holds, valid now, each with a `hash` naming it for revoke. */
+  grants(): { issued: Record<string, unknown>[]; held: Record<string, unknown>[] } {
+    const withHash = (gs: Record<string, unknown>[]) => gs.map((g) => ({ ...g, hash: grantHash(g) }));
+    return { issued: withHash(this.issued.valid()), held: withHash(this.held.valid()) };
+  }
+
+  /** Stops honoring a grant this Peer issued, named by its hash. The peer's copy stays valid elsewhere until it expires. */
+  revoke(hash: string): boolean {
+    const g = this.issued.items.find((x) => grantHash(x) === hash);
+    if (!g) return false;
+    this.issued.remove(g.sig);
+    for (const ps of this.peers.values()) ps.grants.remove(g.sig);
+    return true;
+  }
+
+  /**
+   * Hands `to` the key and address of `peer`, with a grant for `caps` that `peer` honors if it trusts this
+   * Peer with introduce. The grant is bound to `peer` (aud), so it confers nothing on anyone else. The
+   * address is the one `peer` announced or was dialed at.
+   */
+  introduce(to: string, peer: string, caps: string[] = [], ttl = DEFAULT_GRANT_TTL, thread?: string): Sent {
+    if (to === peer) throw new AwpError("cannot introduce a peer to itself");
+    const target = this.ps(to);
+    const known = this.peers.get(keyFingerprint(parseKey(peer)));
+    if (!known?.keyRaw) throw new AwpError(`unknown peer ${peer}`);
+    const address = known.meta.addr ?? known.meta.dialed;
+    if (!address) throw new AwpError(`no known address for ${peer}`);
+    const g = mintGrant(this.identity, to, caps, ttl, peer) as unknown as Record<string, unknown>;
+    this.issued.add(g);
+    const intro: Record<string, unknown> = { key: known.key, address };
+    if (known.meta.name) intro.name = known.meta.name;
+    const obj = this.envelope("introduce", { th: thread, peer: intro, grant: g });
+    target.sendOnce.add(obj);
+    this.connections.get(target.fp)?.queueOnce(obj.id as string);
+    this.newWork(target);
+    return { id: obj.id as string, thread: thread ?? "", to: target.key || to, newThread: false };
   }
 
   /** Closes the connection to the peer gracefully and parks it: no reconnection until something new is queued. */

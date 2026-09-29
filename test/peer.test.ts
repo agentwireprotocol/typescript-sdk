@@ -159,6 +159,45 @@ describe("Peer", () => {
     }
   });
 
+  test("revoke, and introductions with a grant bound to the introduced peer", async () => {
+    const dir = tmp();
+    const a = new Peer({ dir: join(dir, "a"), name: "a@test", pingInterval: 2000 });
+    const b = new Peer({ dir: join(dir, "b"), name: "b@test", pingInterval: 2000 });
+    const c = new Peer({ dir: join(dir, "c"), name: "c@test", pingInterval: 2000 });
+    try {
+      const bAddr = await b.listen(`unix:${join(dir, "b.sock")}`);
+      const cAddr = await c.listen(`unix:${join(dir, "c.sock")}`);
+      await a.connect(bAddr, 10_000);
+      await a.connect(cAddr, 10_000);
+      await nextOf(b, "connected");
+      await nextOf(c, "connected");
+
+      const g = a.grant(b.key, ["fs:read"], 3600);
+      await nextOf(b, "grant");
+      const { issued } = a.grants();
+      expect(issued.map((x) => x.sig)).toEqual([g.sig]);
+      expect([...a.caps(b.key)]).toEqual(["fs:read"]);
+      expect(a.revoke(issued[0]!.hash as string)).toBe(true);
+      expect(a.revoke(issued[0]!.hash as string)).toBe(false);
+      expect([...a.caps(b.key)]).toEqual([]);
+
+      const sent = a.introduce(b.key, c.key, ["fs:read"], 3600);
+      expect(sent.to).toBe(b.key);
+      const intro = await nextOf(b, "introduced");
+      expect([intro.peer, intro.key, intro.address]).toEqual([a.key, c.key, cAddr]);
+      expect(intro.grant?.aud).toBe(c.key);
+      expect(intro.grant?.sub).toBe(b.key);
+      expect([...a.caps(b.key)]).toEqual([]); // bound to c: a itself does not honor it
+      expect(await b.connect(intro.address!, 10_000)).toBe(c.key);
+      await nextOf(c, "connected");
+    } finally {
+      await a.close();
+      await b.close();
+      await c.close();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test("an ephemeral peer keeps nothing", async () => {
     const p = new Peer({ name: "tmp@test" });
     const dir = p.dir;

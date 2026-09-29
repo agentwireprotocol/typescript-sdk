@@ -263,6 +263,11 @@ export function mintGrant(identity: Identity, sub: string, caps: string[], ttl: 
   return { ...body, sig: b64url(sig) } as unknown as Grant;
 }
 
+/** How a grant is named: the SHA-256 of its canonical form, signature included, shortened. */
+export function grantHash(g: Record<string, unknown>): string {
+  return createHash("sha256").update(canonical(g), "utf8").digest("hex").slice(0, 32);
+}
+
 // ---------------------------------------------------------------- helpers
 
 /** A sender-chosen string as a file name that cannot escape a directory. */
