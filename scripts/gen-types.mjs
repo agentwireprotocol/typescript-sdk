@@ -1,5 +1,6 @@
 // Generates src/schema.ts from the vendored JSON Schema.
 import { compile } from "json-schema-to-typescript";
+import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const schema = JSON.parse(readFileSync(new URL("../schema/awp.schema.json", import.meta.url), "utf8"));
@@ -38,5 +39,9 @@ for (const m of blocks) {
     ts = ts.replace(new RegExp(`\\b${m[1]}${m[2]}\\b`, "g"), m[1]);
   }
 }
-writeFileSync(new URL("../src/schema.ts", import.meta.url), ts);
+const out = new URL("../src/schema.ts", import.meta.url);
+writeFileSync(out, ts);
+execFileSync(new URL("../node_modules/.bin/prettier", import.meta.url).pathname, ["--write", out.pathname], {
+  stdio: "ignore",
+});
 console.log("wrote src/schema.ts", ts.length, "bytes");
